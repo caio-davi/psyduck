@@ -1,3 +1,4 @@
+"""Psyduck - A simple command-line tool to process CSV files using CrossEncoder from SentenceTransformers."""
 #!/usr/bin/env python3
 
 import argparse
@@ -6,13 +7,14 @@ import csv
 from pathlib import Path
 from sentence_transformers import CrossEncoder
 
-def cross_encoder(queries, statement):
+def cross_encoder(queries: list[str], statement: str) -> list[dict]:
+    """Function using CrossEncoder to rank queries against a statement."""
     model = CrossEncoder('cross-encoder/stsb-roberta-large')
-    # model = CrossEncoder("cross-encoder/ms-marco-MiniLM-L6-v2")
     ranks = model.rank(statement, queries, return_documents=True)
     return ranks
 
-def load_model(model_path):
+def load_model(model_path: str) -> dict:
+    """Function loading model from CSV file."""
     model = {}
     with open(model_path, mode='r', encoding='utf-8') as csvfile:
         reader = csv.DictReader(csvfile)
@@ -26,12 +28,14 @@ def load_model(model_path):
             model[item].append({'code': code, 'statement': statement, 'value': value})
     return model
 
-def read_statements(statement_path):
+def read_statements(statement_path: str) -> str:
+    """Function reading statements from a text file."""
     with open(statement_path, mode='r', encoding='utf-8') as file:
         lines = [line.strip() for line in file if line.strip()]
     return " ".join(lines)
 
-def run_command(model_path, statement_path):
+def run_command(model_path: str, statement_path: str):
+    """Function to run the command with the given model and statement paths."""
     model_file = Path(model_path)
     if not model_file.exists():
         print(f"Error: Model file '{model_file}' does not exist.")
@@ -57,15 +61,16 @@ def run_command(model_path, statement_path):
 
 
 def main():
+    """Main function to parse arguments and run commands."""
     parser = argparse.ArgumentParser(description="Psyduck - CSV processing tool")
     subparsers = parser.add_subparsers(dest='command', help='Available commands')
-    
+
     run_parser = subparsers.add_parser('run', help='Process a CSV file')
     run_parser.add_argument('model', type=str, help='Path to the model file (CSV)')
     run_parser.add_argument('statement', type=str, help='Path to the statement file to process')
 
     args = parser.parse_args()
-    
+
     if args.command == 'run':
         run_command(args.model, args.statement)
     else:
