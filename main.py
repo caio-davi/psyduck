@@ -5,7 +5,7 @@ import argparse
 import sys
 import csv
 from pathlib import Path
-from sentence_transformers import CrossEncoder
+from sentence_transformers import SentenceTransformer, CrossEncoder
 
 def cross_encoder(queries: list[str], statement: str) -> list[dict]:
     """Function using CrossEncoder to rank queries against a statement."""
@@ -13,7 +13,18 @@ def cross_encoder(queries: list[str], statement: str) -> list[dict]:
     ranks = model.rank(statement, queries, return_documents=True)
     return ranks
 
-def load_model(model_path: str) -> dict:
+def cosine_similarity(queries: list[str], statement: str) -> list[float]:
+    model = SentenceTransformer('all-distilroberta-v1')
+    queries_embedding = model.encode(queries)
+    statement_embedding = model.encode([statement])
+    similarities = model.similarity(queries_embedding, statement_embedding)
+    # print(similarities)
+    # sys.exit(0)
+    # Convert similarities to a flat list of floats
+
+    return [float(x[0]) for x in similarities.tolist()]
+
+def load_comparison_model(model_path: str) -> dict:
     """Function loading model from CSV file."""
     model = {}
     with open(model_path, mode='r', encoding='utf-8') as csvfile:
@@ -28,13 +39,23 @@ def load_model(model_path: str) -> dict:
             model[item].append({'code': code, 'statement': statement, 'value': value})
     return model
 
+def load_score_model(model_path: str) -> list[str]:
+    """Function loading model from CSV file."""
+    model = []
+    with open(model_path, mode='r', encoding='utf-8') as csvfile:
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            model.append(row['STATEMENT'])
+    return model
+
 def read_statements(statement_path: str) -> str:
     """Function reading statements from a text file."""
     with open(statement_path, mode='r', encoding='utf-8') as file:
         lines = [line.strip() for line in file if line.strip()]
     return " ".join(lines)
 
-def run_command(model_path: str, statement_path: str):
+
+def run_command(model_path: str, statement_path: str, compare: bool):
     """Function to run the command with the given model and statement paths."""
     model_file = Path(model_path)
     if not model_file.exists():
@@ -49,15 +70,29 @@ def run_command(model_path: str, statement_path: str):
         print(f"Error: Statement file '{statement_file}' does not exist.")
         sys.exit(1)
 
-    model = load_model(model_file)
     statement = read_statements(statement_file)
 
+    if compare:
+        model = load_comparison_model(model_file)
+        run_comparison_command(model, statement)
+    else:
+        model = load_score_model(model_file)
+        run_score_command(model, statement)
+
+def run_comparison_command(model: dict, statement: str):
+    """Function to run the command with the given model and statement paths."""
     for item, responses in model.items():
         queries = [resp['statement'] for resp in responses]
         rank = cross_encoder(queries, statement)
         argmax = max(rank, key=lambda x: x['score'])['corpus_id']
         most_similar = queries[argmax]
         print(f"{item}: {most_similar}")
+
+def run_score_command(model: dict, statement: str):
+    """Function to run the command with the given model and statement paths."""
+    similarities = cosine_similarity(model, statement)
+    for i in range(len(model)):
+        print(f"{model[i]}: {similarities[i]}")
 
 
 def main():
@@ -68,11 +103,11 @@ def main():
     run_parser = subparsers.add_parser('run', help='Process a CSV file')
     run_parser.add_argument('model', type=str, help='Path to the model file (CSV)')
     run_parser.add_argument('statement', type=str, help='Path to the statement file to process')
-
+    run_parser.add_argument('--compare', type=bool, default=False, required=False, help='Use comparison model')
     args = parser.parse_args()
 
     if args.command == 'run':
-        run_command(args.model, args.statement)
+        run_command(args.model, args.statement, args.compare)
     else:
         parser.print_help()
 
