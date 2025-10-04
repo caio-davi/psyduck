@@ -40,21 +40,34 @@ This will automatically create a virtual environment and install all required de
 
 ### Usage
 
+
 Run the tool using the following command:
 
 ```bash
-./main.py run <model_csv_file> <statement_file>
+./main.py run <model_csv_file> <statement_file> [--compare True|False]
 ```
 
-#### Example
+#### Examples
 
+**Score mode (default):**
 ```bash
 ./main.py run samples/test.csv inputs/test.txt
 ```
 
+**Comparison mode:**
+```bash
+./main.py run samples/test.csv inputs/test.txt --compare True
+```
+
+The `--compare` flag switches between two modes:
+
+- **Score mode**: Computes similarity scores for each statement in the CSV file against the input statement.
+- **Comparison mode**: For grouped items in the CSV, finds the most similar statement per group using a cross-encoder model.
+
+
 ### CSV File Format
 
-Your model CSV file **MUST** have the following structure:
+Your model CSV file **MUST** have the following structure for comparison mode:
 
 ```csv
 ITEM,CODE,STATEMENT,VALUE
@@ -70,11 +83,27 @@ ITEM,CODE,STATEMENT,VALUE
 2,2_E,"Angry",5
 ```
 
+For score mode, only the `STATEMENT` column is required:
+
+```csv
+STATEMENT
+Love
+Like
+Neutral
+Dislike
+Hate
+Happy
+Content
+Indifferent
+Sad
+Angry
+```
+
 **Columns:**
-- `ITEM`: Grouping identifier for related statements
-- `CODE`: Unique code for each response option
-- `STATEMENT`: The actual text statement/response
-- `VALUE`: Numerical value associated with the statement
+- `ITEM`: Grouping identifier for related statements (comparison mode)
+- `CODE`: Unique code for each response option (comparison mode)
+- `STATEMENT`: The actual text statement/response (required)
+- `VALUE`: Numerical value associated with the statement (comparison mode)
 
 ### Statement File Format
 
@@ -84,16 +113,32 @@ The statement file should be a plain text file containing the statement you want
 Would I rather be feared or loved? Easy. Both. I want people to be afraid of how much they love me.
 ```
 
+
 ### How It Works
 
-1. **Model Loading**: The tool loads your CSV file and groups statements by ITEM
-2. **Statement Processing**: Reads the input statement from the text file
-3. **Cross-Encoder Analysis**: Uses a pre-trained cross-encoder model (`cross-encoder/stsb-roberta-large`) to rank similarity between the input statement and all predefined statements
-4. **Best Match Selection**: For each item group, finds the statement with the highest similarity score
-5. **Results Output**: Displays the most similar statement for each item
+**Score mode:**
+1. Loads all statements from the CSV file
+2. Reads the input statement from the text file
+3. Computes cosine similarity scores between the input and each statement
+4. Outputs each statement and its score
+
+**Comparison mode:**
+1. Loads grouped statements from the CSV file
+2. Reads the input statement from the text file
+3. Uses a cross-encoder model to find the most similar statement per group
+4. Outputs the best match for each group
 
 ### Example Output
 
+**Score mode:**
+```
+Love: 0.1234
+Like: 0.5678
+Neutral: 0.4321
+...etc
+```
+
+**Comparison mode:**
 ```
 1: Like
 2: Content
